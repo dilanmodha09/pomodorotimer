@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pomodoro Focus</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            300: '#7dd3fc',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        },
+                        tomato: {
+                            50: '#fff1f2',
+                            100: '#ffe4e6',
+                            200: '#fecdd3',
+                            300: '#fda4af',
+                            400: '#fb7185',
+                            500: '#f43f5e',
+                            600: '#e11d48',
+                            700: '#be123c',
+                            800: '#9f1239',
+                            900: '#881337',
+                        }
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'progress-grow': 'progress 60s linear forwards',
+                    },
+                    keyframes: {
+                        progress: {
+                            '0%': { 'stroke-dashoffset': '0' },
+                            '100%': { 'stroke-dashoffset': '100' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            height: 100vh;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        body.dark {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #f3f4f6;
+        }
+        
+        .tab-btn {
+            color: #64748b;
+        }
+        .tab-btn.active {
+            color: white;
+        }
+        .mode-slider {
+            position: relative;
+            height: 48px;
+        }
+        
+        .button-shadow {
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15);
+        }
+        
+        .timer-circle {
+            filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.1));
+        }
+        
+        .pomodoro-active .timer-container {
+            border-color: #f43f5e;
+        }
+        
+        .short-break-active .timer-container {
+            border-color: #0ea5e9;
+        }
+        
+        .long-break-active .timer-container {
+            border-color: #8b5cf6;
+        }
+        
+        .custom-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 6px;
+            border-radius: 9999px;
+            outline: none;
+        }
+        
+        .custom-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        
+        .progress-track {
+            fill: none;
+            stroke-linecap: round;
+            transform: rotate(-90deg);
+            transform-origin: center;
+            transition: all 0.3s ease;
+        }
+        
+        .progress-bar {
+            fill: none;
+            stroke-linecap: round;
+            transform: rotate(-90deg);
+            transform-origin: center;
+            transition: stroke-dashoffset 0.1s linear;
+        }
+        
+        .modal {
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+        
+        .modal-overlay {
+            transition: background-color 0.3s ease;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100">
+    <div class="min-h-screen flex flex-col">
+        <!-- Header -->
+        <header class="py-4 px-4 sm:px-8 flex justify-between items-center">
+            <h1 class="text-2xl sm:text-3xl font-bold flex items-center">
+                <i class="fas fa-apple-alt mr-3 text-tomato-600 dark:text-tomato-500"></i>
+                Pomodoro Focus
+            </h1>
+            <div class="flex items-center space-x-4">
+                <button id="reset-btn" class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors opacity-70" disabled>
+                    <i class="fas fa-sync"></i>
+                </button>
+                <button id="music-toggle" class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                    <i class="fas fa-music"></i>
+                </button>
+                <button id="settings-toggle" class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                    <i class="fas fa-cog"></i>
+                </button>
+                <button id="theme-toggle" class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                    <i class="fas fa-moon dark:hidden"></i>
+                    <i class="fas fa-sun hidden dark:block"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-grow flex flex-col items-center justify-center p-4 sm:p-8">
+            <!-- Mode Slider -->
+            <div class="relative bg-slate-200 dark:bg-slate-700 rounded-full p-1 mb-8 w-80">
+                <div id="mode-slider" class="flex">
+                    <div class="w-full relative">
+                        <div id="mode-slider-indicator" class="absolute top-0 left-0 h-full rounded-full bg-tomato-500 transition-all duration-300" style="width: 33.33%"></div>
+                        <div class="relative flex z-10">
+                            <button data-mode="pomodoro" class="tab-btn active w-1/3 py-3 px-2 text-sm font-medium transition-colors duration-300 focus:outline-none">
+                                Pomodoro
+                            </button>
+                            <button data-mode="shortBreak" class="tab-btn w-1/3 py-3 px-2 text-sm font-medium transition-colors duration-300 focus:outline-none">
+                                Short Break
+                            </button>
+                            <button data-mode="longBreak" class="tab-btn w-1/3 py-3 px-2 text-sm font-medium transition-colors duration-300 focus:outline-none">
+                                Long Break
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Timer Container -->
+            <div class="timer-container mb-4 rounded-3xl p-4 max-w-md w-full flex flex-col items-center relative">
+                <!-- Circular Timer -->
+                <div class="relative mb-6">
+                    <svg width="240" height="240" viewBox="0 0 320 320" class="timer-circle">
+                        <circle class="progress-track" cx="160" cy="160" r="150" stroke="currentColor" stroke-width="10" fill="none" stroke-opacity="0.1" />
+                        <circle id="progress-bar" class="progress-bar" cx="160" cy="160" r="150" stroke="currentColor" stroke-width="12" fill="none" 
+                                stroke-dasharray="942" stroke-dashoffset="0" stroke-linecap="round" />
+                    </svg>
+                    <div class="absolute inset-0 flex flex-col items-center justify-center">
+                        <div id="time-display" class="text-3xl sm:text-4xl font-bold">25:00</div>
+                    </div>
+                </div>
+                
+                <!-- Timer Controls -->
+                <div class="flex justify-center mt-8 w-full max-w-xs">
+                    <button id="play-pause-btn" class="w-full py-3 rounded-full bg-emerald-500 text-white hover:bg-emerald-600 transition flex items-center justify-center button-shadow text-lg font-medium">
+                        <i class="fas fa-play mr-2"></i><span>Start</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Cycle Counter -->
+            <div class="flex items-center justify-center bg-white dark:bg-slate-800 rounded-xl p-3 max-w-sm w-full shadow-lg">
+                <div class="text-center py-2">
+                    <p class="text-lg font-medium">Current Cycle</p>
+                    <p class="text-slate-600 dark:text-slate-300 mb-3">Completed: <span id="completed-pomodoros">0</span> Pomodoros</p>
+                    <div class="flex justify-center mt-2">
+                        <div class="cycle-step bg-tomato-500 w-8 h-8 rounded-full flex items-center justify-center text-white mx-1"></div>
+                        <div class="cycle-step bg-slate-300 dark:bg-slate-600 w-8 h-8 rounded-full flex items-center justify-center mx-1"></div>
+                        <div class="cycle-step bg-slate-300 dark:bg-slate-600 w-8 h-8 rounded-full flex items-center justify-center mx-1"></div>
+                        <div class="cycle-step bg-slate-300 dark:bg-slate-600 w-8 h-8 rounded-full flex items-center justify-center mx-1"></div>
+                    </div>
+                    <p id="status-display" class="mt-4 text-slate-600 dark:text-slate-300 italic">Ready to focus? Start the timer!</p>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="py-3 px-4 text-center text-slate-500 dark:text-slate-400 text-xs">
+            <p>Made with <i class="fas fa-heart text-tomato-500"></i> to boost your productivity | Pomodoro Focus © 2023</p>
+        </footer>
+
+        <!-- Settings Modal -->
+        <div id="settings-modal" class="modal fixed inset-0 z-50 flex items-center justify-center hidden">
+            <div class="modal-overlay absolute inset-0 bg-black opacity-40"></div>
+            <div class="relative bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-4 sm:p-6 w-full max-w-md">
+                <button id="close-settings" class="absolute top-4 right-4 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+                <h2 class="text-2xl font-bold mb-6">Settings</h2>
+                
+                <div class="space-y-6">
+                    <div>
+                        <h3 class="text-lg font-medium mb-3">Timer Durations</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block mb-1">Pomodoro (minutes)</label>
+                                <div class="flex items-center">
+                                    <input id="pomodoro-duration" type="range" min="5" max="60" value="25" class="custom-slider w-full bg-slate-200 dark:bg-slate-700" />
+                                    <span id="pomodoro-value" class="ml-4 w-12 text-center font-medium">25</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block mb-1">Short Break (minutes)</label>
+                                <div class="flex items-center">
+                                    <input id="short-break-duration" type="range" min="1" max="20" value="5" class="custom-slider w-full bg-slate-200 dark:bg-slate-700" />
+                                    <span id="short-break-value" class="ml-4 w-12 text-center font-medium">5</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block mb-1">Long Break (minutes)</label>
+                                <div class="flex items-center">
+                                    <input id="long-break-duration" type="range" min="10" max="30" value="15" class="custom-slider w-full bg-slate-200 dark:bg-slate-700" />
+                                    <span id="long-break-value" class="ml-4 w-12 text-center font-medium">15</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h3 class="text-lg font-medium mb-3">App Preferences</h3>
+                        <div class="flex items-center justify-between mb-2">
+                            <span>Enable Notifications</span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input id="notifications-toggle" type="checkbox" class="sr-only peer" checked>
+                                <div class="w-11 h-6 bg-slate-300 dark:bg-slate-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                            </label>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span>Background Music</span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input id="music-prefs-toggle" type="checkbox" class="sr-only peer">
+                                <div class="w-11 h-6 bg-slate-300 dark:bg-slate-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <button id="save-settings" class="w-full py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition">Save Settings</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Music Player -->
+        <div id="music-player" class="hidden">
+            <audio id="ambient-music" loop>
+                <source src="#" type="audio/mpeg">
+            </audio>
+            <audio id="timer-alert">
+                <source src="#" type="audio/mpeg">
+            </audio>
+        </div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const modeBtns = document.querySelectorAll('.mode-btn');
+        const playPauseBtn = document.getElementById('play-pause-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const timeDisplay = document.getElementById('time-display');
+        const cycleDisplay = document.getElementById('cycle-display');
+        const progressBar = document.getElementById('progress-bar');
+        const settingsModal = document.getElementById('settings-modal');
+        const settingsToggle = document.getElementById('settings-toggle');
+        const closeSettings = document.getElementById('close-settings');
+        const saveSettingsBtn = document.getElementById('save-settings');
+        const themeToggle = document.getElementById('theme-toggle');
+        const musicToggle = document.getElementById('music-toggle');
+        const cycleSteps = document.querySelectorAll('.cycle-step');
+        const statusDisplay = document.getElementById('status-display');
+        const timerContainer = document.querySelector('.timer-container');
+
+        // Timer Defaults
+        const TIMER_STATES = {
+            POMODORO: 'pomodoro',
+            SHORT_BREAK: 'shortBreak',
+            LONG_BREAK: 'longBreak'
+        };
+
+        // Current state
+        let state = {
+            mode: TIMER_STATES.POMODORO,
+            remainingTime: 25 * 60,
+            timerRunning: false,
+            intervalId: null,
+            completedPomodoros: 0,
+            pomodoroDuration: 25, // minutes
+            shortBreakDuration: 5, // minutes
+            longBreakDuration: 15, // minutes
+            longBreakAfter: 4, // after 4 pomodoros
+            musicPlaying: false,
+            theme: 'light'
+        };
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            // Load settings from localStorage
+            const savedSettings = localStorage.getItem('pomodoroSettings');
+            if (savedSettings) {
+                const settings = JSON.parse(savedSettings);
+                state = {...state, ...settings};
+                
+                // Update UI to reflect loaded settings
+                document.getElementById('pomodoro-duration').value = state.pomodoroDuration;
+                document.getElementById('pomodoro-value').textContent = state.pomodoroDuration;
+                document.getElementById('short-break-duration').value = state.shortBreakDuration;
+                document.getElementById('short-break-value').textContent = state.shortBreakDuration;
+                document.getElementById('long-break-duration').value = state.longBreakDuration;
+                document.getElementById('long-break-value').textContent = state.longBreakDuration;
+                document.getElementById('notifications-toggle').checked = true;
+                
+                // Set theme if saved
+                if (state.theme === 'dark') {
+                    document.documentElement.classList.add('dark');
+                    document.body.classList.add('dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                    document.body.classList.remove('dark');
+                }
+            }
+            
+            // Set initial timer display
+            updateDisplay();
+            updateCycleIndicator();
+        });
+
+        // Theme toggle
+        themeToggle.addEventListener('click', () => {
+            const isDark = document.documentElement.classList.toggle('dark');
+            document.body.classList.toggle('dark', isDark);
+            state.theme = isDark ? 'dark' : 'light';
+            saveSettingsToLocalStorage();
+        });
+
+        // Mode switching
+        const modeSliderBtns = document.querySelectorAll('.tab-btn');
+        const modeSliderIndicator = document.getElementById('mode-slider-indicator');
+        
+        modeSliderBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                modeSliderBtns.forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                
+                const mode = e.target.dataset.mode;
+                setMode(mode);
+                
+                // Move slider indicator
+                if (mode === 'pomodoro') {
+                    modeSliderIndicator.style.transform = 'translateX(0)';
+                    modeSliderIndicator.style.width = '33.33%';
+                    modeSliderIndicator.style.backgroundColor = '#f43f5e';
+                } else if (mode === 'shortBreak') {
+                    modeSliderIndicator.style.transform = 'translateX(100%)';
+                    modeSliderIndicator.style.width = '33.33%';
+                    modeSliderIndicator.style.backgroundColor = '#0ea5e9';
+                } else {
+                    modeSliderIndicator.style.transform = 'translateX(200%)';
+                    modeSliderIndicator.style.width = '33.33%';
+                    modeSliderIndicator.style.backgroundColor = '#8b5cf6';
+                }
+                
+                timerContainer.className = 'timer-container mb-12 rounded-3xl p-8 max-w-2xl w-full flex flex-col items-center relative ' + 
+                    (state.mode === TIMER_STATES.POMODORO ? 'pomodoro-active' : 
+                     state.mode === TIMER_STATES.SHORT_BREAK ? 'short-break-active' : 
+                     'long-break-active');
+                
+                if (!state.timerRunning) {
+                    resetTimer();
+                }
+            });
+        });
+
+        // Timer controls
+        playPauseBtn.addEventListener('click', () => {
+            if (state.timerRunning) {
+                pauseTimer();
+            } else {
+                startTimer();
+            }
+        });
+        resetBtn.addEventListener('click', resetTimer);
+
+        // Settings modal
+        settingsToggle.addEventListener('click', () => {
+            settingsModal.classList.remove('hidden');
+        });
+
+        closeSettings.addEventListener('click', () => {
+            settingsModal.classList.add('hidden');
+        });
+
+        // Duration sliders
+        const sliders = [
+            {id: 'pomodoro-duration', output: 'pomodoro-value'},
+            {id: 'short-break-duration', output: 'short-break-value'},
+            {id: 'long-break-duration', output: 'long-break-value'}
+        ];
+
+        sliders.forEach(slider => {
+            const input = document.getElementById(slider.id);
+            const output = document.getElementById(slider.output);
+            
+            input.addEventListener('input', () => {
+                output.textContent = input.value;
+            });
+        });
+
+        // Save settings
+        saveSettingsBtn.addEventListener('click', () => {
+            state.pomodoroDuration = parseInt(document.getElementById('pomodoro-duration').value);
+            state.shortBreakDuration = parseInt(document.getElementById('short-break-duration').value);
+            state.longBreakDuration = parseInt(document.getElementById('long-break-duration').value);
+            
+            // Reset timer with new settings if not running
+            if (!state.timerRunning) {
+                resetTimer();
+            }
+            
+        function saveSettingsToLocalStorage() {
+            localStorage.setItem('pomodoroSettings', JSON.stringify({
+                pomodoroDuration: state.pomodoroDuration,
+                shortBreakDuration: state.shortBreakDuration,
+                longBreakDuration: state.longBreakDuration,
+                theme: state.theme
+            }));
+        }
+            
+            settingsModal.classList.add('hidden');
+            showTemporaryMessage('Settings saved!');
+        });
+
+        // Music toggle
+        musicToggle.addEventListener('click', () => {
+            state.musicPlaying = !state.musicPlaying;
+            musicToggle.innerHTML = state.musicPlaying ? '<i class="fas fa-volume-up"></i>' : '<i class="fas fa-music"></i>';
+            
+            // In a real app, we would play ambient music here
+            if (state.musicPlaying) {
+                showTemporaryMessage('Background music enabled');
+            } else {
+                showTemporaryMessage('Background music disabled');
+            }
+        });
+
+        // Timer functions
+        function setMode(mode) {
+            state.mode = mode;
+            resetTimer();
+            statusDisplay.textContent = mode === TIMER_STATES.POMODORO ? 
+                "Ready to focus? Start the timer!" : 
+                "Time for a break! Relax your mind.";
+        }
+
+        function startTimer() {
+            if (state.timerRunning) return;
+            
+            state.timerRunning = true;
+            playPauseBtn.innerHTML = '<i class="fas fa-pause mr-2"></i><span>Pause</span>';
+            playPauseBtn.classList.remove('bg-emerald-500', 'hover:bg-emerald-600');
+            playPauseBtn.classList.add('bg-tomato-500', 'hover:bg-tomato-600');
+            resetBtn.disabled = false;
+            
+            // Highlight current cycle step if in pomodoro mode
+            if (state.mode === TIMER_STATES.POMODORO) {
+                cycleSteps.forEach((step, index) => {
+                    if (index === state.completedPomodoros) {
+                        step.classList.add('bg-tomato-500', 'text-white');
+                        step.innerHTML = '<i class="fas fa-play text-xs"></i>';
+                    }
+                });
+            }
+            
+            statusDisplay.textContent = state.mode === TIMER_STATES.POMODORO ? 
+                "Focusing... You've got this!" : 
+                "Enjoy your break! You've earned it.";
+            
+            state.intervalId = setInterval(() => {
+                state.remainingTime--;
+                updateDisplay();
+                
+                if (state.remainingTime <= 0) {
+                    clearInterval(state.intervalId);
+                    state.timerRunning = false;
+                    
+                    // Play notification sound
+                    if (Notification.permission === 'granted') {
+                        new Notification('Pomodoro Focus', {
+                            body: state.mode === TIMER_STATES.POMODORO ? 
+                                'Session completed! Time for a break.' : 
+                                'Break over! Time to focus again.'
+                        });
+                    }
+                    
+                    // Add chime sound in a real implementation
+                    
+                    // Handle next step
+                    if (state.mode === TIMER_STATES.POMODORO) {
+                        state.completedPomodoros++;
+                        updateCycleIndicator();
+                        
+                        if (state.completedPomodoros % state.longBreakAfter === 0) {
+                            setMode(TIMER_STATES.LONG_BREAK);
+                            document.querySelector('[data-mode="longBreak"]').click();
+                            statusDisplay.textContent = "Well done! Time for a longer break.";
+                        } else {
+                            setMode(TIMER_STATES.SHORT_BREAK);
+                            document.querySelector('[data-mode="shortBreak"]').click();
+                            statusDisplay.textContent = "Good job! Take a short break.";
+                        }
+                    } else {
+                        setMode(TIMER_STATES.POMODORO);
+                        document.querySelector('[data-mode="pomodoro"]').click();
+                    }
+                    
+                    resetTimer();
+                }
+            }, 1000);
+        }
+
+        function pauseTimer() {
+            if (!state.timerRunning) return;
+            
+            clearInterval(state.intervalId);
+            state.timerRunning = false;
+            playPauseBtn.innerHTML = '<i class="fas fa-play mr-2"></i><span>Start</span>';
+            playPauseBtn.classList.remove('bg-tomato-500', 'hover:bg-tomato-600');
+            playPauseBtn.classList.add('bg-emerald-500', 'hover:bg-emerald-600');
+            statusDisplay.textContent = "Paused. Ready to continue?";
+            
+            // Remove highlight from current cycle step if in pomodoro mode
+            if (state.mode === TIMER_STATES.POMODORO) {
+                cycleSteps.forEach((step, index) => {
+                    if (index === state.completedPomodoros) {
+                        step.classList.remove('bg-tomato-500', 'text-white');
+                        step.innerHTML = (index + 1).toString();
+                    }
+                });
+            }
+        }
+
+        function resetTimer() {
+            if (state.intervalId) {
+                clearInterval(state.intervalId);
+                state.intervalId = null;
+            }
+            
+            state.timerRunning = false;
+            playPauseBtn.innerHTML = '<i class="fas fa-play mr-2"></i> Start';
+            resetBtn.disabled = true;
+            
+            // Set remaining time based on current mode
+            if (state.mode === TIMER_STATES.POMODORO) {
+                state.remainingTime = state.pomodoroDuration * 60;
+                timerContainer.className = 'timer-container mb-12 rounded-3xl p-8 max-w-2xl w-full flex flex-col items-center relative pomodoro-active';
+            } else if (state.mode === TIMER_STATES.SHORT_BREAK) {
+                state.remainingTime = state.shortBreakDuration * 60;
+                timerContainer.className = 'timer-container mb-12 rounded-3xl p-8 max-w-2xl w-full flex flex-col items-center relative short-break-active';
+            } else {
+                state.remainingTime = state.longBreakDuration * 60;
+                timerContainer.className = 'timer-container mb-12 rounded-3xl p-8 max-w-2xl w-full flex flex-col items-center relative long-break-active';
+            }
+            
+            updateDisplay();
+        }
+
+        function updateDisplay() {
+            const minutes = Math.floor(state.remainingTime / 60);
+            const seconds = state.remainingTime % 60;
+            timeDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            
+            // Update progress bar
+            let totalTime;
+            if (state.mode === TIMER_STATES.POMODORO) {
+                totalTime = state.pomodoroDuration * 60;
+            } else if (state.mode === TIMER_STATES.SHORT_BREAK) {
+                totalTime = state.shortBreakDuration * 60;
+            } else {
+                totalTime = state.longBreakDuration * 60;
+            }
+            
+            const progress = 942 - (942 * (state.remainingTime / totalTime));
+            progressBar.style.strokeDashoffset = progress;
+            
+            // Set progress bar color
+            progressBar.style.stroke = state.mode === TIMER_STATES.POMODORO ? 
+                '#f43f5e' : state.mode === TIMER_STATES.SHORT_BREAK ? 
+                '#0ea5e9' : '#8b5cf6';
+        }
+
+        function updateCycleIndicator() {
+            cycleDisplay.textContent = `Completed: ${state.completedPomodoros} Pomodoro${state.completedPomodoros === 1 ? '' : 's'}`;
+            
+            // Update cycle step indicators
+            cycleSteps.forEach((step, index) => {
+                step.className = `cycle-step w-8 h-8 rounded-full flex items-center justify-center mx-1 ${
+                    index < state.completedPomodoros ? 
+                    'bg-tomato-500 text-white' : 
+                    'bg-slate-300 dark:bg-slate-600'
+                }`;
+                
+                if (index < state.completedPomodoros) {
+                    step.innerHTML = '<i class="fas fa-check text-xs"></i>';
+                } else {
+                    step.innerHTML = (index + 1).toString();
+                }
+            });
+        }
+
+        function showTemporaryMessage(message) {
+            const prevMessage = statusDisplay.textContent;
+            statusDisplay.textContent = message;
+            
+            setTimeout(() => {
+                statusDisplay.textContent = prevMessage;
+            }, 2000);
+        }
+        
+        // Request notification permission on load
+        if ('Notification' in window) {
+            if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+                Notification.requestPermission();
+            }
+        }
+    </script>
+</body>
+</html>
